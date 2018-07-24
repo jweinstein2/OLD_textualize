@@ -11,6 +11,40 @@ import numpy as np
 
 from datetime import date, datetime, timedelta
 
+def plt_frequency(num, save=None, period="M"):
+    messages = messages_for_number(num)
+    messages.sort_values(by='timestamp')
+
+    periods = messages.timestamp.dt.to_period(period)
+    first = periods[0].to_timestamp()
+    last = periods.tail(1).values[0].to_timestamp()
+    last = datetime.now()
+
+    sent = messages.loc[messages['is_from_me'] == 1]
+    recieved = messages.loc[messages['is_from_me'] == 0]
+    count_sent = sent['timestamp'].groupby(periods).agg('count')
+    count_recieved = recieved['timestamp'].groupby(periods).agg('count')
+
+    dates = pd.date_range(first, last, freq=period)
+    y_s = [count_sent.get(date, 0) for date in dates]
+    y_r = [count_recieved.get(date, 0) for date in dates]
+
+    x = np.arange(0, len(dates))
+    fig, ax = plt.subplots(1,1)
+    plt.plot(x, y_s, label='sent')
+    plt.plot(x, y_r, label='received')
+    num_ticks = 10
+    stride = max(1, min(len(x), int(len(x) / 10)))
+    ax.set_xticks(x[::stride])
+    ax.set_xticklabels(dates.date[::stride])
+    fig.autofmt_xdate()
+
+    if save == None:
+        plt.show()
+    else:
+        plt.savefig(save)
+    plt.close('all')
+
 def find_name(num):
     contacts = pd.read_pickle('src/contacts.pck')
     names = contacts.loc[contacts['value'] == num[-10:]].Name.tolist()
@@ -161,39 +195,6 @@ def messages_for_number(num, ignore_groups=True):
     filtered_messages = filtered_messages.merge(messages, how='left', left_on='message_id', right_on='ROWID')
     return filtered_messages
 
-def plt_frequency(num, save=None, period="M"):
-    messages = messages_for_number(num)
-    messages.sort_values(by='timestamp')
-
-    periods = messages.timestamp.dt.to_period(period)
-    first = periods[0].to_timestamp()
-    last = periods.tail(1).values[0].to_timestamp()
-    last = datetime.now()
-
-    sent = messages.loc[messages['is_from_me'] == 1]
-    recieved = messages.loc[messages['is_from_me'] == 0]
-    count_sent = sent['timestamp'].groupby(periods).agg('count')
-    count_recieved = recieved['timestamp'].groupby(periods).agg('count')
-
-    dates = pd.date_range(first, last, freq=period)
-    y_s = [count_sent.get(date, 0) for date in dates]
-    y_r = [count_recieved.get(date, 0) for date in dates]
-
-    x = np.arange(0, len(dates))
-    fig, ax = plt.subplots(1,1)
-    plt.plot(x, y_s, label='sent')
-    plt.plot(x, y_r, label='received')
-    num_ticks = 10
-    stride = max(1, min(len(x), int(len(x) / 10)))
-    ax.set_xticks(x[::stride])
-    ax.set_xticklabels(dates.date[::stride])
-    fig.autofmt_xdate()
-
-    if save == None:
-        plt.show()
-    else:
-        plt.savefig(save)
-    plt.close('all')
 
 
 if __name__ == "__main__":
@@ -230,5 +231,3 @@ if __name__ == "__main__":
 
     # for i in range(len(stats)):
     #    plt_frequency(stats.number[i], save='output/'+stats.name[i])
-
-
