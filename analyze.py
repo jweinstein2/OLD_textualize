@@ -11,35 +11,8 @@ import numpy as np
 
 from datetime import date, datetime, timedelta
 
-def ts(val):
-    val = val / 10 ** 9
-
-    unix = datetime(1970, 1, 1)  # UTC
-    cocoa = datetime(2001, 1, 1)  # UTC
-    delta = cocoa - unix
-    timestamp = datetime.fromtimestamp(val) + delta
-    timestamp.strftime('%Y-%m-%d %H:%M:%S')
-    return pd.to_datetime(timestamp)
-
-def preprocess():
-    connection = sqlite3.connect('src/messages.db')
-    cur = connection.cursor()
-
-    df = pd.read_sql_query("SELECT * FROM message", connection)
-    handle_df = pd.read_sql_query("SELECT * FROM handle", connection)
-
-    # add datestamp
-    df['timestamp'] = df.apply (lambda row: ts(row.at['date']), axis=1)
-
-    df['n_collapsed'] = 0
-    df['last_send'] = df['timestamp']
-
-    df.to_pickle('message.pck')
-    cur.close()
-    connection.close()
-
 def find_name(num):
-    contacts = pd.read_pickle('contacts.pck')
+    contacts = pd.read_pickle('src/contacts.pck')
     names = contacts.loc[contacts['value'] == num[-10:]].Name.tolist()
     if len(names) == 0:
         return ""
@@ -47,7 +20,7 @@ def find_name(num):
         print("duplicate entries found:", num, names)
     return names[0]
 
-def collapse(messages):
+def collapse(messages, within=timedelta(minutes=10)):
     messages['delete'] = False
 
     for c in range(len(messages) - 1, 0, -1):
@@ -56,7 +29,7 @@ def collapse(messages):
         curr = messages.loc[c]
         if curr['is_from_me'] != prev['is_from_me']:
             continue
-        if curr.timestamp - prev.timestamp > timedelta(minutes=10):
+        if curr.timestamp - prev.timestamp > within:
             continue
 
         messages.loc[p, 'n_collapse'] += messages.loc[c, 'n_collapse']
@@ -69,12 +42,12 @@ def collapse(messages):
         messages.loc[p, 'text'] =  curr_text + '\n' + prev_text
 
     messages = messages.loc[messages['delete'] == False]
-    messages = messages.drop(columns=['delete'])
+    messages = messages.drop(['delete'], axis=1)
     messages = messages.reset_index(drop=True)
     return messages
 
-def conversation_stats(messages, info_dict):
-    all_msgs = pd.read_pickle('message.pck')
+def conversation_stats(messages, info_dict, convo_gap=timedelta(hours=14)):
+    all_msgs = pd.read_pickle('src/message.pck')
     started = 0
     ended = 0
     total = 0
@@ -92,7 +65,7 @@ def conversation_stats(messages, info_dict):
         curr = messages.loc[c]
 
         # gap between conversations
-        if curr.timestamp - prev.timestamp > timedelta(hours=14):
+        if curr.timestamp - prev.timestamp > convo_gap:
             if curr['is_from_me'] == 1: started += 1
             if prev['is_from_me'] == 1: ended += 1
             total += 1
@@ -125,14 +98,14 @@ def conversation_stats(messages, info_dict):
     info_dict['their_response_time'] = their_rt
     return info_dict
 
-def agg_stats_for_number(num):
+def process_number(num):
     info_dict = {}
     info_dict['number'] = num
     info_dict['name'] = find_name(num)
 
     messages = messages_for_number(num)
 
-    # collapse messages sent inear each other
+    # collapse messages sent near each other
     should_collapse = True
     messages['n_collapse'] = 1
     messages['collapse_final_timestamp'] = messages['timestamp']
@@ -169,10 +142,10 @@ def agg_stats_for_number(num):
     return info_dict
 
 def messages_for_number(num, ignore_groups=True):
-    ch_join = pd.read_pickle('chat_handle_join.pck')
-    handle = pd.read_pickle('handle.pck')
-    cm_join = pd.read_pickle('chat_message_join.pck')
-    messages = pd.read_pickle('message.pck')
+    ch_join = pd.read_pickle('src/chat_handle_join.pck')
+    handle = pd.read_pickle('src/handle.pck')
+    cm_join = pd.read_pickle('src/chat_message_join.pck')
+    messages = pd.read_pickle('src/message.pck')
 
     handle_ids = handle.loc[handle['id'] == num]['ROWID'].tolist()
     chat_ids = ch_join.loc[ch_join['handle_id'].isin(handle_ids)]['chat_id'].tolist()
@@ -188,12 +161,10 @@ def messages_for_number(num, ignore_groups=True):
     filtered_messages = filtered_messages.merge(messages, how='left', left_on='message_id', right_on='ROWID')
     return filtered_messages
 
-
-def plt_frequency(num, save=None):
+def plt_frequency(num, save=None, period="M"):
     messages = messages_for_number(num)
     messages.sort_values(by='timestamp')
 
-    period = "M"
     periods = messages.timestamp.dt.to_period(period)
     first = periods[0].to_timestamp()
     last = periods.tail(1).values[0].to_timestamp()
@@ -225,39 +196,39 @@ def plt_frequency(num, save=None):
     plt.close('all')
 
 
-def process():
+if __name__ == "__main__":
     parallel = True
     overwrite = True
 
     if not os.path.isfile("stats.pck") or overwrite:
-        handle = pd.read_pickle('handle.pck')
+        handle = pd.read_pickle('src/handle.pck')
         numbers = handle.id.unique()
 
         if parallel:
             pool_num = multiprocessing.cpu_count()
             print("running on {} cpus".format(pool_num))
             pool = multiprocessing.Pool(pool_num)
-            info_lst = list(pool.imap_unordered(agg_stats_for_number, numbers))
+            info_lst = list(pool.imap_unordered(process_number, numbers))
             pool.close()
             pool.join()
         else:
             print("running on single cpu")
-            info_lst = [agg_stats_for_number(n) for n in numbers]
+            info_lst = [process_number(n) for n in numbers]
 
         info_lst = list(filter(None, info_lst))
         stats = pd.DataFrame(info_lst)
         stats = stats.sort_values(by='n_sent', ascending=False)
         stats = stats.reset_index(drop=True)
 
-        stats.to_pickle('stats.pck')
+        os.makedirs('pck', exist_ok=True)
+        stats.to_pickle('pck/stats.pck')
 
-    stats = pd.read_pickle('stats.pck')
+    stats = pd.read_pickle('pck/stats.pck')
+
+    os.makedirs('output', exist_ok=True)
     stats.to_csv('output/_stats.csv')
 
-    for i in range(len(stats)):
-        plt_frequency(stats.number[i], save='output/'+stats.name[i])
+    # for i in range(len(stats)):
+    #    plt_frequency(stats.number[i], save='output/'+stats.name[i])
 
-if __name__ == "__main__":
-    # preprocess()
-    process()
 

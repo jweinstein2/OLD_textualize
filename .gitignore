@@ -1,3 +1,4 @@
-src/*
-output/*
+src/
+output/
 pck/
+backup/
