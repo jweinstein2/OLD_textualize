@@ -1,0 +1,11 @@
+#!/bin/bash
+
+echo Hello World
+
+# install required dependencies
+
+# start flask backend
+python3 app.py
+
+# start react js frontend
+npm run start
