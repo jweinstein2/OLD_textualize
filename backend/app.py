@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 
 import src.setup as setup
@@ -22,17 +22,23 @@ def api_get_src():
 
 @app.route('/api/data/src/', methods = ['POST'])
 def api_set_src():
-    return setup.set_src(request.form['value'])
+    setup.set_src(request.form['value'])
+    resp = jsonify(success=True)
+    return resp
 
 @app.route('/api/data/setup', methods = ['POST'])
 def api_setup():
-    return setup.preprocess()
+    if not setup.preprocess():
+        return jsonify(success=False)
+    if not analyze.process():
+        return jsonify(success=False)
+    return jsonify(success=True)
 
 @app.route('/api/data/process', methods = ['POST'])
 def api_process():
     if analyze.process():
-        return 'success'
-    return 'failure'
+        return jsonify(success=True)
+    return jsonify(success=False)
 
 @app.route('/api/convos', methods = ['GET'])
 def api_contacts(n=15):
