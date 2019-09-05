@@ -6,6 +6,9 @@ Pulling out insights from message history.
 
 This project only works for iOS devices: android is currently unsupported.
 
+You may have to grant full disk access to your terminal application.
+http://osxdaily.com/2018/10/09/fix-operation-not-permitted-terminal-error-macos/
+
 ### Dependencies
 
 ### Setup
