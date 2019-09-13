@@ -5,17 +5,58 @@ from datetime import date, datetime, timedelta
 import pdb
 
 from src.util import *
+import src.data_manager as data_manager
 
-def contacts(message_df, n):
-    df = message_df.number.value_counts()[:n]
-    return json.dumps(df.to_dict())
 
-def frequency(message_df, number=None, period='M'):
-    # if number != None:
-    #     messages = messages_for_number(number)
-    # else:
-    #     messages = pd.read_pickle('data/message.pck')
+# TODO: add additional information name, number, sent, received
+def handles(message_df, n):
+    df = message_df.handle_id.value_counts()[:n]
+    return df.to_dict()
 
+def emojis(message_df, n):
+    import emoji
+    import regex
+
+    text = message_df.text.str.cat(sep = " ")
+
+    emoji_list = []
+    data = regex.findall(r'\X', text)
+    for word in data:
+        if any(char in emoji.UNICODE_EMOJI for char in word):
+            emoji_list.append(word)
+
+
+    f = open('output.txt', 'w+', encoding='utf-8')
+    f.write("".join(text))
+    f.close()
+
+
+    total_sent = len(emoji_list)
+    value_count = pd.Series(emoji_list).value_counts()
+    top_value_count = value_count[:n]
+    top_value_count['other'] = value_count[n:].cumsum()[-1]
+
+    return emoji_list
+
+def sentiment(message_df):
+    pass
+    # from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+    # analyser = SentimentIntensityAnalyzer()
+
+
+    # sent = message_df.loc[message_df['is_from_me'] == 1]
+    # received = message_df.loc[message_df['is_from_me'] == 0]
+
+    # sent_text = sent.text.str.cat(sep = " ")
+    # received_text = received.text.str.cat(sep = " ")
+    # score1 = analyser.polarity_scores(sent_text)
+    # score2 = analyser.polarity_scores(received_text)
+
+    # print(score1)
+    # print(score2)
+
+
+def frequency(message_df, period='M'):
     message_df = message_df.sort_values(by='timestamp').reset_index()
 
     periods = message_df.timestamp.dt.to_period(period)

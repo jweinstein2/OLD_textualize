@@ -27,7 +27,7 @@ class Summary extends Component {
     }
 
     componentDidMount() {
-        const url = "http://127.0.0.1:5000/api/stats/frequency";
+        const url = "http://127.0.0.1:5000/api/stats/1066/frequency";
         fetch(url, {
             method: "GET",
             mode:"cors",

@@ -64,33 +64,77 @@ def setup():
         if success == False:
             return make_response(content, SERVER_ERROR, headers)
         result = jsonify(content)
-        return make_response(content, CREATED, headers)
+        return make_response(result, CREATED, headers)
 
     if request.method == 'DELETE':
         config.del_process_progress()
         return make_response('', NO_CONTENT, headers)
 
 # HANDLE ALL STAT REQUESTS
-@app.route('/api/stats/contacts', methods = ['GET'])
-def contacts():
+
+# return n most frequent handles by total sent / received
+# TODO: add sort by sent and received
+@app.route('/api/handles', methods = ['GET'])
+def handles():
     n = int(request.args.get('n', 15))
     start = request.args.get('start', None)
     end = request.args.get('end', None)
 
     msg = data_manager.messages(start=start, end=end)
-    return stats.contacts(msg, n)
+    result = stats.handles(msg, n)
+    content = jsonify(result)
+    return make_response(content, OK, headers)
 
 @app.route('/api/stats/frequency', methods = ['GET'])
-@app.route('/api/stats/<number>/frequency', methods = ['GET'])
-def frequency(number=None):
+@app.route('/api/stats/<handle>/frequency', methods = ['GET'])
+def frequency(handle=None):
     start = request.args.get('start', None)
     end = request.args.get('end', None)
+    period = request.args.get('period', 'M')
+    if handle is not None:
+        try:
+            handle = int(handle)
+        except ValueError:
+            return make_response('invalid handle', NOT_FOUND, headers)
 
-    msg = data_manager.messages(start=start, end=end)
-    return stats.frequency(msg, number=number, period='M')
+    msg = data_manager.messages(handle=handle, start=start, end=end)
+    result = stats.frequency(msg, period=period)
+    return make_response(result, OK, headers)
 
 
+@app.route('/api/stats/emoji', methods = ['GET'])
+@app.route('/api/stats/<handle>/emoji', methods = ['GET'])
+def emoji(handle=None):
+    n = int(request.args.get('n', 15))
+    start = request.args.get('start', None)
+    end = request.args.get('end', None)
+    if handle is not None:
+        try:
+            handle = int(handle)
+        except ValueError:
+            return make_response('invalid handle', NOT_FOUND, headers)
 
+    msg = data_manager.messages(handle=handle, start=start, end=end)
+    result = stats.emojis(msg, n)
+
+    return make_response('', NOT_IMPLEMENTED, headers)
+
+# @app.route('/api/stats/sentiment', methods = ['GET'])
+# @app.route('/api/stats/<handle>/sentiment', methods = ['GET'])
+# def sentiment(handle=None):
+#     start = request.args.get('start', None)
+#     end = request.args.get('end', None)
+#     if handle is not None:
+#         try:
+#             handle = int(handle)
+#         except ValueError:
+#             return make_response('invalid handle', NOT_FOUND, headers)
+#
+#     msg = data_manager.messages(handle=handle, start=start, end=end)
+#     # result = stats.sentiment(msg)
+#     senti.process(msg)
+#
+#     return make_response('', NOT_IMPLEMENTED, headers)
 
 # @app.route('/api/convos/summary', methods = ['GET'])
 # def api_summary():

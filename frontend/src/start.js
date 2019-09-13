@@ -8,7 +8,11 @@ const url = require('url')
 let mainWindow
 
 function createWindow() {
-  mainWindow = new BrowserWindow({ width: 800, height: 600 })
+  mainWindow = new BrowserWindow({
+      show: false,
+      title: "Textualize"})
+  mainWindow.maximize()
+  mainWindow.show()
 
   mainWindow.loadURL(
     process.env.ELECTRON_START_URL ||

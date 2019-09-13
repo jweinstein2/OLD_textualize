@@ -3,13 +3,19 @@ import pandas as pd
 import pdb
 import os
 import subprocess
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 from src.util import *
 from datetime import date, datetime, timedelta
 import src.configuration as config
 
-messages = '3d0d7e5fb2ce288813306e4d4636395e047a3d28'
-contacts = '31bb7ba8914766d4ba40d6dfb6113c8b614be442'
+MESSAGES = '3d0d7e5fb2ce288813306e4d4636395e047a3d28'
+CONTACTS = '31bb7ba8914766d4ba40d6dfb6113c8b614be442'
+
+CM_JOIN_PATH = 'data/chat_message_join.pck'
+CH_JOIN_PATH = 'data/chat_handle_join.pck'
+MESSAGES_PATH = 'data/message.pck'
+HANDLES_PATH = 'data/handle.pck'
 
 def guess_src():
     possible = []
@@ -59,7 +65,7 @@ def _process(backup_path):
     print('find database')
     # Messages
     try:
-        message_db = subprocess.check_output("find '" + backup_path + "' -iname '" + messages + "'", shell=True).splitlines()[0].decode("utf-8")
+        message_db = subprocess.check_output("find '" + backup_path + "' -iname '" + MESSAGES + "'", shell=True).splitlines()[0].decode("utf-8")
     except subprocess.CalledProcessError as e:
         return False, 'unable to find contact database'
 
@@ -103,6 +109,10 @@ def _process(backup_path):
     ch_counts = ch_counts.astype(bool)
     message_df['is_group'] = ch_counts[chat_ids].values
 
+    print('sentiment analysis')
+    # analyser = SentimentIntensityAnalyzer()
+    # import pdb; pdb.set_trace()
+
     print('save')
     os.makedirs('data/', exist_ok=True)
     print("created dir")
@@ -116,7 +126,7 @@ def _process(backup_path):
     print('contacts')
     # Contacts
     try:
-        contact_db = subprocess.check_output("find '" + backup_path + "' -iname '" + contacts + "'", shell=True).splitlines()[0].decode("utf-8")
+        contact_db = subprocess.check_output("find '" + backup_path + "' -iname '" + CONTACTS + "'", shell=True).splitlines()[0].decode("utf-8")
     except subprocess.CalledProcessError as e:
         # raise RuntimeError("command '{}' return with error (code {}): {}".format(e.cmd, e.returncode, e.output))
         return False, 'contact database not in expected location'
@@ -163,45 +173,54 @@ def _process(backup_path):
 
 
 #: MARK: Methods that read directly from the pickled dataframes
+def cm_join():
+    return pd.read_pickle(CM_JOIN_PATH)
+
+def ch_join():
+    return pd.read_pickle(CH_JOIN_PATH)
+
+def handles():
+    return pd.read_pickle(HANDLES_PATH)
 
 # Get the messages df filtered by time, group, and sender
-def messages(num=None, include_group=False, start=None, end=None):
-    df = pd.read_pickle('data/message.pck')
-    if num: df = df.loc[df['number'] == num]
+def messages(handle=None, include_group=False, start=None, end=None):
+    df = pd.read_pickle(MESSAGES_PATH)
+
+    if handle: df = df.loc[df['handle_id'] == handle]
     if include_group: df = df.loc[df['is_group'] == True]
     # TODO: add temporal filter
     # if start_date: df = df.loc[df['is_group'] >= start_date]
     # if start_date: df = df.loc[df['is_group'] < end_date]
     return df
 
-def messages_for_number(num, ignore_groups=True):
-    ch_join = pd.read_pickle('data/chat_handle_join.pck')
-    handle = pd.read_pickle('data/handle.pck')
-    cm_join = pd.read_pickle('data/chat_message_join.pck')
-    messages = pd.read_pickle('data/message.pck')
-
-    handle_ids = handle.loc[handle['id'] == num]['ROWID'].tolist()
-    chat_ids = ch_join.loc[ch_join['handle_id'].isin(handle_ids)]['chat_id'].tolist()
-
-    if ignore_groups:
-        chats = []
-        for cid in chat_ids:
-            if ch_join.loc[ch_join['chat_id'] == cid].shape[0] == 1:
-                chats.append(cid)
-        chat_ids = chats
-
-    filtered_messages = cm_join.loc[cm_join['chat_id'].isin(chat_ids)]
-    filtered_messages = filtered_messages.merge(messages, how='left', left_on='message_id', right_on='ROWID')
-    return filtered_messages
-
-def find_name(num):
-    contacts = pd.read_pickle('data/contacts.pck')
-    names = contacts.loc[contacts['value'] == num[-10:]].Name.tolist()
-    if len(names) == 0:
-        return ""
-    if len(names) > 1:
-        print("duplicate entries found:", num, names)
-    return names[0]
+# def messages_for_number(num, ignore_groups=True):
+#     ch_join = pd.read_pickle('data/chat_handle_join.pck')
+#     handle = pd.read_pickle('data/handle.pck')
+#     cm_join = pd.read_pickle('data/chat_message_join.pck')
+#     messages = pd.read_pickle('data/message.pck')
+#
+#     handle_ids = handle.loc[handle['id'] == num]['ROWID'].tolist()
+#     chat_ids = ch_join.loc[ch_join['handle_id'].isin(handle_ids)]['chat_id'].tolist()
+#
+#     if ignore_groups:
+#         chats = []
+#         for cid in chat_ids:
+#             if ch_join.loc[ch_join['chat_id'] == cid].shape[0] == 1:
+#                 chats.append(cid)
+#         chat_ids = chats
+#
+#     filtered_messages = cm_join.loc[cm_join['chat_id'].isin(chat_ids)]
+#     filtered_messages = filtered_messages.merge(messages, how='left', left_on='message_id', right_on='ROWID')
+#     return filtered_messages
+#
+# def find_name(num):
+#     contacts = pd.read_pickle('data/contacts.pck')
+#     names = contacts.loc[contacts['value'] == num[-10:]].Name.tolist()
+#     if len(names) == 0:
+#         return ""
+#     if len(names) > 1:
+#         print("duplicate entries found:", num, names)
+#     return names[0]
 
 if __name__ == '__main__':
     preprocess()
