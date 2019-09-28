@@ -6,6 +6,7 @@ import src.data_manager as data_manager
 
 # import src.analyze as analyze
 import src.stats as stats
+# TODO: https://stackoverflow.com/questions/15231359/split-python-flask-app-into-multiple-files
 
 app = Flask(__name__)
 CORS(app)
@@ -71,7 +72,6 @@ def setup():
         return make_response('', NO_CONTENT, headers)
 
 # HANDLE ALL STAT REQUESTS
-
 # return n most frequent handles by total sent / received
 # TODO: add sort by sent and received
 @app.route('/api/handles', methods = ['GET'])

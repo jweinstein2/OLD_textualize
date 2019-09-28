@@ -14,6 +14,7 @@ CONTACTS = '31bb7ba8914766d4ba40d6dfb6113c8b614be442'
 
 CM_JOIN_PATH = 'data/chat_message_join.pck'
 CH_JOIN_PATH = 'data/chat_handle_join.pck'
+CONTACTS_PATH = 'data/contacts.pck'
 MESSAGES_PATH = 'data/message.pck'
 HANDLES_PATH = 'data/handle.pck'
 
@@ -109,10 +110,6 @@ def _process(backup_path):
     ch_counts = ch_counts.astype(bool)
     message_df['is_group'] = ch_counts[chat_ids].values
 
-    print('sentiment analysis')
-    # analyser = SentimentIntensityAnalyzer()
-    # import pdb; pdb.set_trace()
-
     print('save')
     os.makedirs('data/', exist_ok=True)
     print("created dir")
@@ -181,6 +178,9 @@ def ch_join():
 
 def handles():
     return pd.read_pickle(HANDLES_PATH)
+
+def contacts():
+    return pd.read_pickle(CONTACTS_PATH)
 
 # Get the messages df filtered by time, group, and sender
 def messages(handle=None, include_group=False, start=None, end=None):

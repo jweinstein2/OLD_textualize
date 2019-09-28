@@ -8,9 +8,10 @@ from src.util import *
 import src.data_manager as data_manager
 
 
-# TODO: add additional information name, number, sent, received
 def handles(message_df, n):
     df = message_df.handle_id.value_counts()[:n]
+    contacts = data_manager.contacts()
+    import pdb; pdb.set_trace()
     return df.to_dict()
 
 def emojis(message_df, n):

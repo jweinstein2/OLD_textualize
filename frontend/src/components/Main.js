@@ -19,6 +19,7 @@ import HelpIcon from '@material-ui/icons/Help';
 import ChevronLeftIcon from '@material-ui/icons/ChevronLeft';
 import ChevronRightIcon from '@material-ui/icons/ChevronRight';
 
+import Contact from './Contact.js';
 import Summary from './Summary.js';
 
 const drawerWidth = 200;
@@ -112,9 +113,7 @@ function getContent(selected) {
         case "Summary":
             return <Summary />;
         case "Contacts":
-            return (
-                <h1> Contacts Not Implemented </h1>
-            );
+            return <Contact id={1066} />;
         case "Table":
             return (
                 <h1> Table Not Implemented </h1>

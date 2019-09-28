@@ -55,6 +55,7 @@
     ]
   },
   "devDependencies": {
-    "electron-builder": "^21.2.0"
+    "electron-builder": "^21.2.0",
+    "eslint-plugin-react-hooks": "^2.0.1"
   }
 }
