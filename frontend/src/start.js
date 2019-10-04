@@ -1,6 +1,7 @@
 const electron = require('electron')
 const app = electron.app
 const BrowserWindow = electron.BrowserWindow
+const { dialog } = electron
 
 const path = require('path')
 const url = require('url')
@@ -8,32 +9,30 @@ const url = require('url')
 let mainWindow
 
 const { ipcMain } = electron
-ipcMain.on('asynchronous-message', (event, arg) => {
-  console.log(arg) // prints "ping"
-  event.reply('asynchronous-reply', 'pong')
-})
+ipcMain.on('async-file-select', (event, arg) => {
+    console.log(arg) // prints "ping"
 
-ipcMain.on('synchronous-message', (event, arg) => {
-  console.log(arg) // prints "ping"
-  event.returnValue = 'pong'
-})
-
-function selectFile() {
-    console.log("hello there")
-    const { dialog } = require('electron')
-    dialog.showOpenDialog(mainWindow, { buttonLabel: "Select", properties: ['openFile', 'openDirectory']
+    dialog.showOpenDialog(mainWindow, {
+        buttonLabel: "Select",
+        properties: ['openFile', 'openDirectory']
     }).then(result => {
         console.log(result.canceled)
         console.log(result.filePaths)
+        event.reply('async-file-reply', result)
     }).catch(err => {
         console.log(err)
+        event.reply('async-file-reply', err)
     })
-}
+})
 
 function createWindow() {
     mainWindow = new BrowserWindow({
         show: false,
-        title: "Textualize"})
+        title: "Textualize",
+        webPreferences: {
+            nodeIntegration: true, // SECURITY RISK: used to access ipcRenderer
+        },
+    })
     mainWindow.maximize()
     mainWindow.show()
 
@@ -63,6 +62,4 @@ app.on('activate', () => {
     if (mainWindow === null) {
         createWindow()
     }
-
-    selectFile()
 })

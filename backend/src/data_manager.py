@@ -1,4 +1,6 @@
 import sqlite3
+import threading
+import shutil
 import pandas as pd
 import pdb
 import os
@@ -18,6 +20,8 @@ CONTACTS_PATH = 'data/contacts.pck'
 MESSAGES_PATH = 'data/message.pck'
 HANDLES_PATH = 'data/handle.pck'
 
+process_lock = threading.Lock()
+
 def guess_src():
     possible = []
 
@@ -34,42 +38,106 @@ def guess_src():
     # TODO: add windows support
     return possible
 
+# Returns:
+# STATUS         | ADDITIONAL
+# ------------------------------
+# "failed"       | description
+# "in progress"  | status
+# "completed"    | None
+# "unstarted"    | None
 def process_progress():
-    return config.get_process_progress()
+    if process_lock.locked():
+        return "in_progress", config.get_process_progress()
+
+    progress = config.get_process_progress()
+    if progress == -1:
+        # something went wrong
+        return "failed", config.get_last_error()
+    elif progress == 100:
+        return "completed", None
+    else:
+        return "unstarted", None
+
+def clear():
+    #TODO: shutdown process thread
+    if process_lock.locked():
+        print("processing in background: shit is about to go south")
+
+    shutil.rmtree('./data/', ignore_errors=True)
+    config.del_process_progress()
+    config.del_last_error()
+
 
 # Kicks off threads to asychronously analyze the data
-#
 # Returns:
 #   False if process fails to start
 #   Assorted stats if asychronous task is started
-def process(backup_path=None):
-    if backup_path == None:
-        backup_path = config.get_backup_path()
+def process(backup_path):
     if backup_path == None:
         return False, 'backup path has not been set'
 
-    if config.get_process_progress() != None:
-        return False, 'process not started. one is already in progress'
+    if not process_lock.acquire(False):
+        # lock wasn't acquired
+        return False, 'process already in progress'
 
-    # config.set_process_progress(0)
-    success, content = _process(backup_path)
 
-    # TODO: distinguish between failure and unstarted
-    if success == False:
-        config.del_process_progress()
-    if success == True:
-        config.set_process_progress(0)
+    # get quick stats to return immediately
+    # TODO
+    content = ['Analyzing over 200 messages',
+               'from over 68 contacts',
+               'in over 400 countries']
 
-    return success, content
+    # start non-blocking thread for heavy processing
+    t = threading.Thread(target = _async_process,
+                     name = 'processing',
+                     args = (backup_path, process_lock))
+    t.start()
+    return True, content
+
+def _async_process(path, lock):
+    config.del_last_error()
+    try:
+        success, message = _process(path)
+        if not success:
+            config.set_process_progress(-1)
+            config.set_last_error(message)
+            print("Handled failure while processing")
+            print(message)
+            return
+
+    except Exception as e:
+        config.set_process_progress(-1);
+        config.set_last_error(str(e))
+        print("Unexpected error while processing")
+        print(e)
+        return
+
+    config.set_process_progress(100)
+    lock.release()
+
+def _process_dummy(path):
+    del path
+    import time
+
+    TIME = 20
+    for i in range(TIME + 1):
+        print (i)
+        prog = int(100 * (i / float(TIME)))
+        config.set_process_progress(prog)
+        time.sleep(1)
+
+    return True, None
 
 def _process(backup_path):
+    config.set_process_progress(1);
     print('find database')
     # Messages
     try:
         message_db = subprocess.check_output("find '" + backup_path + "' -iname '" + MESSAGES + "'", shell=True).splitlines()[0].decode("utf-8")
     except subprocess.CalledProcessError as e:
-        return False, 'unable to find contact database'
+        return False, 'unable to find message database'
 
+    config.set_process_progress(10);
     print('load database')
     connection = sqlite3.connect(message_db)
     cur = connection.cursor()
@@ -78,14 +146,16 @@ def _process(backup_path):
     ch_join = pd.read_sql_query("SELECT * FROM chat_handle_join", connection)
     cm_join = pd.read_sql_query("SELECT * FROM chat_message_join", connection)
 
+    config.set_process_progress(20);
     print('datestamp lambda')
     # add datestamp
     # TODO: this is really slow
-    message_df['timestamp'] = message_df.apply (lambda row: ts(row.at['date']), axis=1)
+    message_df['timestamp'] = message_df['date'].apply(ts)
     print('datestamp manipulation')
     message_df['n_collapsed'] = 0
     message_df['last_send'] = message_df['timestamp']
 
+    config.set_process_progress(30);
     # TODO: This could be skipped to save time
     print('number')
     # add number (0 for sent messages in groupchat)
@@ -96,20 +166,20 @@ def _process(backup_path):
     numbers = handle_reordered.loc[message_df.handle_id].id
     message_df['number'] = numbers.values
 
+    config.set_process_progress(40);
     print('group info')
     # add group information
-    # import pdb; pdb.set_trace()
     message_df['is_group'] = 2
     message_ids = message_df.ROWID
     # TODO:
     chat_ids = cm_join.set_index(['message_id']).loc[message_ids].chat_id
-    # pdb.set_trace()
     ch_counts = ch_join.chat_id.value_counts()
     ch_counts.loc[ch_counts <= 1] = 0
     ch_counts.loc[ch_counts > 1] = 1
     ch_counts = ch_counts.astype(bool)
     message_df['is_group'] = ch_counts[chat_ids].values
 
+    config.set_process_progress(50);
     print('save')
     os.makedirs('data/', exist_ok=True)
     print("created dir")
@@ -120,6 +190,7 @@ def _process(backup_path):
     cur.close()
     connection.close()
 
+    config.set_process_progress(60);
     print('contacts')
     # Contacts
     try:
@@ -152,6 +223,7 @@ def _process(backup_path):
     cur = connection.cursor()
     df = pd.read_sql_query(query, connection)
 
+    config.set_process_progress(70);
     # generate full name string
     first = list(map(lambda v: v or "", df["First"]))
     last = list(map(lambda v: v or "", df["Last"]))
@@ -160,13 +232,13 @@ def _process(backup_path):
     df['Name'] = full
     df = df.loc[df['Name'] != " "]
 
+    config.set_process_progress(80);
     # simplify phone number data
-    def parse_num(num):
-        return "".join(list(filter(str.isdigit, num)))[-10:]
     df['value'] = df['value'].map(lambda a: parse_num(a))
 
     df.to_pickle('data/contacts.pck')
-    return True, 'success [STATS]'
+    config.set_process_progress(100);
+    return True, None
 
 
 #: MARK: Methods that read directly from the pickled dataframes
@@ -183,17 +255,17 @@ def contacts():
     return pd.read_pickle(CONTACTS_PATH)
 
 # Get the messages df filtered by time, group, and sender
-def messages(handle=None, include_group=False, start=None, end=None):
+def messages(number=None, is_group=None, start=None, end=None):
     df = pd.read_pickle(MESSAGES_PATH)
 
-    if handle: df = df.loc[df['handle_id'] == handle]
-    if include_group: df = df.loc[df['is_group'] == True]
+    if number: df = df.loc[df.number == number]
+    if is_group is not None: df = df.loc[df['is_group'] == is_group]
     # TODO: add temporal filter
     # if start_date: df = df.loc[df['is_group'] >= start_date]
     # if start_date: df = df.loc[df['is_group'] < end_date]
     return df
 
-# def messages_for_number(num, ignore_groups=True):
+# deVf messages_for_number(num, ignore_groups=True):
 #     ch_join = pd.read_pickle('data/chat_handle_join.pck')
 #     handle = pd.read_pickle('data/handle.pck')
 #     cm_join = pd.read_pickle('data/chat_message_join.pck')

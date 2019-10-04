@@ -3,7 +3,17 @@ import json
 CONFIG_PATH = 'application.conf'
 BACKUP_KEY = 'backup'
 PROCESS_PROGRESS_KEY = 'analysis_progress'
+LAST_ERROR_KEY = 'last_error'
 default_configuration = {}
+
+def get_last_error():
+    return _get(LAST_ERROR_KEY)
+
+def set_last_error(value):
+    _set(LAST_ERROR_KEY, value)
+
+def del_last_error():
+    _del(LAST_ERROR_KEY)
 
 def get_backup_path():
     return _get(BACKUP_KEY)

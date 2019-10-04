@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import Setup from './components/Setup.js';
+import Setup from './components/onboarding/Setup.js';
 import Main from './components/Main.js';
-import Process from './components/Process.js';
+import Process from './components/onboarding/Process.js';
 
 import './style/App.css';
 
@@ -14,14 +14,9 @@ function App() {
             mode: "cors",
             dataType: "application/json"
         };
-        fetch('http://127.0.0.1:5000/api/data/src', header)
-        .then(r => {
-            if (r.status === 404) {
-                setStage(1);
-                return;
-            }
-            setStage(3);
-        })
+        fetch('http://127.0.0.1:5000/api/data/state', header)
+        .then(r => r.json(), e => setStage(4))
+        .then(json => setStage(json['state']))
         .catch(error => {
             debugger;
             console.log(error)
@@ -29,6 +24,7 @@ function App() {
     }, []);
 
     function completeStage() {
+        console.log("COMPLETE STAGE");
         setStage(stage + 1)
     }
 
@@ -45,6 +41,10 @@ function App() {
         case 3:
             // display full app
             return <Main />;
+        case 4:
+            return <div>
+                        Something Went Wrong?
+                    </div>
         default:
             // unexpected case
             debugger;

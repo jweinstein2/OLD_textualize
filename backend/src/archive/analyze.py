@@ -110,30 +110,6 @@ def agg_stats_for_number(num):
     sent = messages.loc[messages['is_from_me'] == 1]
     recieved = messages.loc[messages['is_from_me'] == 0]
 
-    info_dict['n_sent'] = len(sent)
-    info_dict['n_recieved'] = len(recieved)
-    if len(sent) < 100 or len(recieved) < 100:
-        return
-
-    sent_text = "\n".join(filter(None, sent['text'].tolist()))
-    recieved_text ='\n'.join(filter(None, recieved['text'].tolist()))
-
-    words_s = list(map(lambda s: s.lower(), re.compile('\w+').findall(sent_text)))
-    words_r = list(map(lambda s: s.lower(), re.compile('\w+').findall(recieved_text)))
-    dictionary = enchant.Dict("en_US")
-    words_s = list(filter(lambda w: dictionary.check(w), words_s))
-    words_r = list(filter(lambda w: dictionary.check(w), words_r))
-    unique_s = len(set(words_s))
-    unique_r = len(set(words_r))
-    avg_len_s = sum(list(map(len, words_s))) / len(words_s)
-    avg_len_r = sum(list(map(len, words_r))) / len(words_r)
-    info_dict['vocab_sent'] = unique_s
-    info_dict['vocab_recieved'] = unique_r
-    info_dict['avg_wordlen_sent'] = round(avg_len_s, 2)
-    info_dict['avg_wordlen_recieved'] = round(avg_len_r, 2)
-
-    return info_dict
-
 def generate_summary():
     parallel = True
 

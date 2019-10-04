@@ -9,18 +9,18 @@ import IconButton from '@material-ui/core/IconButton';
 import ListItem from '@material-ui/core/ListItem';
 import ListItemIcon from '@material-ui/core/ListItemIcon';
 import ListItemText from '@material-ui/core/ListItemText';
+import { Route, Switch, Link } from 'react-router-dom';
 
 import HomeIcon from '@material-ui/icons/Home';
 import PersonIcon from '@material-ui/icons/Person';
-import StarIcon from '@material-ui/icons/Star';
 import SettingsIcon from '@material-ui/icons/Settings';
 import ViewListIcon from '@material-ui/icons/ViewList';
-import HelpIcon from '@material-ui/icons/Help';
 import ChevronLeftIcon from '@material-ui/icons/ChevronLeft';
 import ChevronRightIcon from '@material-ui/icons/ChevronRight';
 
-import Contact from './Contact.js';
+import ContactSummary from './ContactSummary.js';
 import Summary from './Summary.js';
+import Setting from './Setting.js';
 
 const drawerWidth = 200;
 
@@ -57,14 +57,13 @@ const useStyles = makeStyles(theme => ({
     },
     content: {
         flexGrow: 1,
-        padding: theme.spacing(3),
+        padding: theme.spacing(0, 2, 0, 2)
     },
 }));
 
 export default function Main() {
     const classes = useStyles();
     const [open, setOpen] = React.useState(false);
-    const [selected, setSelected] = React.useState("Summary")
 
     return (
         <div className={classes.root}>
@@ -90,58 +89,51 @@ export default function Main() {
             </div>
             <Divider />
             <List>
-                {menuItem("Summary", <HomeIcon />, setSelected)}
-                {menuItem("Contacts", <PersonIcon />, setSelected)}
-                {menuItem("Table", <ViewListIcon />, setSelected)}
-                {menuItem("Advanced", <StarIcon />, setSelected)}
+                {menuItem("Summary", <HomeIcon />)}
+                {menuItem("Contacts", <PersonIcon />)}
+                {menuItem("Groups", <ViewListIcon />)}
             </List>
             <Divider />
             <List>
-                {menuItem("Settings", <SettingsIcon />, setSelected)}
-                {menuItem("About", <HelpIcon />, setSelected)}
+                {menuItem("Settings", <SettingsIcon />)}
             </List>
             </Drawer>
             <main className={classes.content}>
-            { getContent(selected) }
+            { getContent() }
             </main>
         </div>
     );
 }
 
-function getContent(selected) {
-    switch (selected) {
-        case "Summary":
-            return <Summary />;
-        case "Contacts":
-            return <Contact id={1066} />;
-        case "Table":
-            return (
-                <h1> Table Not Implemented </h1>
-            );
-        case "Advanced":
-            return (
-                <h1> Advanced Not Implemented </h1>
-            );
-        case "Settings":
-            return (
-                <h1> Settings Not Implemented </h1>
-            );
-        case "About":
-            return (
-                <h1> About Not Implemented </h1>
-            );
-        default:
-            debugger;
-            return (
-                <h1> Unhandled Menu Item </h1>
-            );
-    }
-
+function getContent() {
+    return (
+        <Switch>
+            <Route exact path={["/summary", "/"]}>
+                <Summary />
+            </Route>
+            <Route path="/contacts">
+                <ContactSummary />
+            </Route>
+            <Route path="/groups">
+                <h1>Groups not Implemented</h1>
+            </Route>
+            <Route path="/settings">
+                <Setting />
+            </Route>
+            <Route path="*">
+                <h1> 404: Page</h1>
+            </Route>
+        </Switch>
+    );
 }
 
-function menuItem(text, icon, callback) {
+function menuItem(text, icon) {
     return(
-        <ListItem button key={text} onClick={() => callback(text)}>
+        <ListItem button
+            component={Link}
+            to={'/' + text.toLowerCase()}
+            key={text}
+            >
         <ListItemIcon>{icon}</ListItemIcon>
         <ListItemText primary={text} />
         </ListItem>
